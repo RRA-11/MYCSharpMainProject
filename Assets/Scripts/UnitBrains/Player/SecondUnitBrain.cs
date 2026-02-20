@@ -1,6 +1,10 @@
 ﻿using System.Collections.Generic;
+using System.Linq;
+using Model;
+using Model.Runtime;
 using Model.Runtime.Projectiles;
 using UnityEngine;
+using Utilities;
 
 namespace UnitBrains.Player
 {
@@ -12,7 +16,8 @@ namespace UnitBrains.Player
         private float _temperature = 0f;
         private float _cooldownTime = 0f;
         private bool _overheated;
-        
+        public List<Vector2Int> UnreachableTargets = new List<Vector2Int>();
+
         protected override void GenerateProjectiles(Vector2Int forTarget, List<BaseProjectile> intoList)
         {
             float overheatTemperature = OverheatTemperature;
@@ -31,7 +36,10 @@ namespace UnitBrains.Player
 
         public override Vector2Int GetNextStep()
         {
-            return base.GetNextStep();
+            if (UnreachableTargets.Count > 0) 
+                return unit.Pos.CalcNextStepTowards(UnreachableTargets[0]);
+            else
+                return unit.Pos;
         }
 
         protected override List<Vector2Int> SelectTargets()
@@ -39,22 +47,33 @@ namespace UnitBrains.Player
             ///////////////////////////////////////
             // Homework 1.4 (1st block, 4rd module)
             ///////////////////////////////////////
-            List<Vector2Int> result = GetReachableTargets();
+            List<Vector2Int> result = new();
+            var allTargets = GetAllTargets();
             float min = float.MaxValue;
-            Vector2Int bestTarget = Vector2Int.zero;
-            foreach (var target in result)
+            int enemyId = IsPlayerUnitBrain ? RuntimeModel.BotPlayerId : RuntimeModel.PlayerId;
+            var bestTarget = result.First();
+            if (result.Any())
             {
-                if (min > DistanceToOwnBase(target))
+                foreach (var target in result)
                 {
-                    min = DistanceToOwnBase(target);
-                    bestTarget = target;
+                    if (min > DistanceToOwnBase(target))
+                    {
+                        min = DistanceToOwnBase(target);
+                        bestTarget = target;
+                    }
                 }
             }
-
             result.Clear();
             if (min < float.MaxValue)
-                result.Add(bestTarget);
-            return result;
+            {
+                if (!GetReachableTargets().Contains(bestTarget))
+                    UnreachableTargets.Add(bestTarget);
+                else
+                    result.Add(bestTarget);
+            }
+            else
+                result.Add(runtimeModel.RoMap.Bases[enemyId]);
+                return result;
             ///////////////////////////////////////
         }
 
